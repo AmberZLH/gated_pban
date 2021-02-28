@@ -113,20 +113,27 @@ class PBAN(nn.Module):
         aspect_len = torch.sum(aspect_text != 0, dim=-1)
         h_t, _ = self.left_gru(aspect, aspect_len.cpu())  #64,4,400
     
-        '''加入门控 116~126 '''
-        # context+position
-        s_i = F.tanh(torch.add(torch.matmul(h_x, self.weight_m), self.bias_m))
-        temp=self.v_a(h_t)
-        #64,4,400
-    
+        '''-----------------加入门控---------------------------'''
+        # context+position 64,66,400
+        WX = torch.matmul(h_x, self.weight_x)  # 64,x,400
+        s_sum = torch.add(WX, self.bias_x)  # 64,--,400
+        s_i = F.tanh(s_sum)  # 64,--,400
         # aspect
-        a=torch.matmul(h_t, temp)
-        b=torch.transpose(h_x, 1, 2)
-        a_i = F.relu(torch.add(torch.matmul(a, b), self.bias_m))
-    
+        VA = torch.matmul(h_t, self.weight_v)  # 64,a,400
+        a_sum = torch.add(VA, self.bias_v)  # 64,a,400
+
+        m = torch.rand(a_sum.size())  # WX
+        arr = m.permute(0,2,1)
+        WT = torch.bmm(WX, arr)
+        WT2 = torch.bmm(WT,a_sum)  #
+        # print('mSize:', m.size())
+        # print('arrSize:', arr.size())
+        # print('WTSize:', WT.size())
+        # print('WT2Size:', WT2.size())
+        # print('tempSize:', temp.size())
+        a_i = F.relu(torch.add(WT2,WX))
         # c_i = torch.matmul(torch.matmul(s_i, a_i))
-
-
+        '''-----------------------------------------------------'''
 
         ''' Aspect term to position-aware sentence attention '''
         alpha = F.softmax(F.tanh(torch.add(torch.matmul(torch.matmul(a_i, self.weight_m),
