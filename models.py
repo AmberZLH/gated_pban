@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from layers import DynamicLSTM, SqueezeEmbedding, SoftAttention
+from tnet_lf import TNet_LF
 
 class LSTM(nn.Module):
     ''' Standard LSTM '''
@@ -90,6 +91,9 @@ class PBAN(nn.Module):
                                     batch_first=True, bidirectional=True, rnn_type='GRU')
         self.right_gru = DynamicLSTM(opt.embed_dim+opt.position_dim, opt.hidden_dim, num_layers=1, 
                                      batch_first=True, bidirectional=True, rnn_type='GRU')
+        
+        '''TNet_LF'''
+        self.tnet_lf = TNet_LF(embedding_matrix, opt)
     
         self.weight_m = nn.Parameter(torch.Tensor(opt.hidden_dim*2, opt.hidden_dim*2))
         self.bias_m = nn.Parameter(torch.Tensor(1))
@@ -97,7 +101,7 @@ class PBAN(nn.Module):
         self.bias_n = nn.Parameter(torch.Tensor(1))
         self.w_r = nn.Linear(opt.hidden_dim*2, opt.hidden_dim)
         self.w_s = nn.Linear(opt.hidden_dim, opt.polarities_dim)
-        self.v_a = nn.Linear(opt.hidden_dim*2, opt.hidden_dim)  # aspect
+
     
     def forward(self, inputs):
         text, aspect_text, position_tag = inputs[0], inputs[1], inputs[2]
@@ -132,19 +136,25 @@ class PBAN(nn.Module):
         # print('WT2Size:', WT2.size())
         # print('tempSize:', temp.size())
         a_i = F.relu(torch.add(WT2,WX))
-        # c_i = torch.matmul(torch.matmul(s_i, a_i))
+        c_i = torch.add(s_i, a_i)
+        '''-----------------------------------------------------'''
+        
+        '''-----------------加入TNet_LF--------------------------'''
+        h_i = tnet_lf(c_i)
+        print('h_i:',h_i.size())
+        
         '''-----------------------------------------------------'''
 
-        ''' Aspect term to position-aware sentence attention '''
-        alpha = F.softmax(F.tanh(torch.add(torch.matmul(torch.matmul(a_i, self.weight_m),
-                                                 torch.transpose(s_i, 1, 2)), self.bias_m)), dim=1)
-        s_x = torch.matmul(alpha, c_i)
-        ''' Position-aware sentence attention to aspect term '''
-        s_i_pool = torch.unsqueeze(torch.div(torch.sum(s_i, dim=1), x_len.float().view(x_len.size(0), 1)), dim=1)
-        gamma = F.softmax(F.tanh(torch.add(torch.matmul(torch.matmul(s_i_pool, self.weight_n),
-                                                 torch.transpose(c_i, 1, 2)), self.bias_n)), dim=1)
-        h_r = torch.squeeze(torch.matmul(gamma, s_x), dim=1)
-        ''' Output transform '''
-        out = F.tanh(self.w_r(h_r))
-        out = self.w_s(out)
+#         ''' Aspect term to position-aware sentence attention '''
+#         alpha = F.softmax(F.tanh(torch.add(torch.matmul(torch.matmul(a_i, self.weight_m),
+#                                                  torch.transpose(s_i, 1, 2)), self.bias_m)), dim=1)
+#         s_x = torch.matmul(alpha, c_i)
+#         ''' Position-aware sentence attention to aspect term '''
+#         s_i_pool = torch.unsqueeze(torch.div(torch.sum(s_i, dim=1), x_len.float().view(x_len.size(0), 1)), dim=1)
+#         gamma = F.softmax(F.tanh(torch.add(torch.matmul(torch.matmul(s_i_pool, self.weight_n),
+#                                                  torch.transpose(c_i, 1, 2)), self.bias_n)), dim=1)
+#         h_r = torch.squeeze(torch.matmul(gamma, s_x), dim=1)
+#         ''' Output transform '''
+#         out = F.tanh(self.w_r(h_r))
+#         out = self.w_s(out)
         return out
