@@ -126,7 +126,7 @@ class PBAN(nn.Module):
         VA = torch.matmul(h_t, self.weight_v)  # 64,a,400
         a_sum = torch.add(VA, self.bias_v)  # 64,a,400
 
-        m = torch.rand(a_sum.size())  # WX
+        m = torch.ones(a_sum.size())  # WX
         arr = m.permute(0,2,1)
         WT = torch.bmm(WX, arr)
         WT2 = torch.bmm(WT,a_sum)  #
