@@ -70,7 +70,7 @@ class TNet_LF(nn.Module):
             aspect_mid = torch.cat((aspect_mid, v), dim=1).transpose(1, 2)
             aspect_mid = F.relu(self.fc1(aspect_mid).transpose(1, 2))
             v = aspect_mid + v
-            v = self.position(v.transpose(1, 2), aspect_in_text).transpose(1, 2)
+            v = 、、、(v.transpose(1, 2), aspect_in_text).transpose(1, 2)
         z = F.relu(self.convs3(v))  # [(N,Co,L), ...]*len(Ks)
         z = F.max_pool1d(z, z.size(2)).squeeze(2)
         out = self.fc(z)
